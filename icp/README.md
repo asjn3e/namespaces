@@ -2,7 +2,7 @@
 namespace-identifier: icp
 title: Internet Computer
 author: Jeff Jafari (@asjn3e)
-discussions-to: https://github.com/ChainAgnostic/namespaces/pull/TODO
+discussions-to: https://github.com/ChainAgnostic/namespaces/pull/238
 status: Draft
 type: Informational
 created: 2026-10-11
