@@ -25,6 +25,8 @@ This profile covers principals only; see the [Rationale section](#rationale).
 
 ## Specification
 
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in [BCP 14][] ([RFC 2119][], [RFC 8174][]) when, and only when, they appear in all capitals, as shown here.
+
 ### Semantics
 
 A principal is a byte string of 0 to 29 bytes.
@@ -34,7 +36,7 @@ The [IC Interface Specification][Principals] defines several classes:
 - Self-authenticating IDs: `SHA-224(public_key) · 0x02`, 29 bytes. A user who holds the matching private key signs requests as this principal.
 - Derived IDs: 29 bytes ending with `0x03`.
 - The anonymous ID: the single byte `0x04`.
-- Reserved IDs: byte strings ending with `0x7f`, which address nothing.
+- Reserved IDs: a blob of 0 to 28 bytes followed by `0x7f`. Because no principal is longer than 29 bytes, every principal whose last byte is `0x7f` is reserved. Reserved IDs address neither a canister nor a user.
 
 The empty principal is the ID of the management canister, a system interface.
 
@@ -58,14 +60,15 @@ The `account_address` is the canonical textual form of the principal, as the [IC
 4. Insert a dash after every 5 characters, except at the end.
 
 The result is 8 to 63 characters long.
-CAIP-10 is case-sensitive, so the address is always lowercase.
+CAIP-10 is case-sensitive, and the address MUST be lowercase.
 
-The regular expression checks only the shape of the address.
-To validate an address:
+The regular expression is necessary but not sufficient.
+It checks only the shape of the address, and it accepts some lengths that no principal produces.
+Implementations MUST validate an address with all three of these steps:
 
 1. Decode it with a principal library. This checks the CRC-32 checksum.
 2. Encode the decoded principal again.
-3. Compare the result with the input. If they differ, the address is not canonical.
+3. Compare the result with the input. If they differ, the address is not canonical and MUST be rejected.
 
 Step 3 rejects uppercase input and input without dashes.
 The IC Interface Specification allows parsers to accept uppercase input, so decoding alone does not prove that an address is canonical.
@@ -112,12 +115,20 @@ icp:737ba355e855bd4b61279056603e0550:ryjl3-tyaaa-aaaaa-aaaba-cai
 
 # User: a self-authenticating principal (29 bytes), from the ICRC-1 Textual Encoding examples
 icp:737ba355e855bd4b61279056603e0550:k2t6j-2nvnp-4zjm3-25dtz-6xhaa-c7boj-5gayf-oj3xs-i43lp-teztq-6ae
+```
 
+The following strings are valid account IDs, but they name system or reserved principals, not ordinary accounts.
+Wallets SHOULD NOT accept them as destinations for funds; see the [Security](#security) section.
+
+```bash
 # Shortest valid address: the empty principal, which is the management canister
 icp:737ba355e855bd4b61279056603e0550:aaaaa-aa
 
 # The anonymous principal
 icp:737ba355e855bd4b61279056603e0550:2vxsx-fae
+
+# A reserved ID: the single byte 0x7f
+icp:737ba355e855bd4b61279056603e0550:ck4ig-id7
 ```
 
 The following strings are not valid account IDs:
@@ -141,10 +152,15 @@ icp:737ba355e855bd4b61279056603e0550:051b05839339f89053454a4b9865ea0452a4bffe2b1
 ### Security
 
 Any client can send calls as the anonymous principal, `2vxsx-fae`, without a signature.
-Wallets should not offer it as a destination for funds.
+Wallets SHOULD NOT offer it as a destination for funds.
 
 The management canister, `aaaaa-aa`, is a system interface, not an account that anyone controls.
-Wallets should not offer it as a destination for funds either.
+Wallets SHOULD NOT offer it as a destination for funds either.
+
+Reserved IDs carry the highest risk of lost funds.
+A reserved ID matches the regular expression, passes the CRC-32 check, and survives the canonical check, so it is a valid account address.
+It addresses neither a canister nor a user, so no one can move funds sent to it.
+Wallets SHOULD reject reserved IDs, whose last byte is `0x7f`, as transfer destinations.
 
 ### Subaccounts
 
@@ -155,6 +171,7 @@ The [ICRC-22][ICRC-22 draft] draft is the current work on that question.
 ## References
 
 - [CAIP-10][]: the Account ID Specification.
+- [BCP 14][]: the meaning of the requirement key words, defined by [RFC 2119][] and [RFC 8174][].
 - [CAIP-2 profile][]: how this namespace forms the chain ID.
 - [Principals][]: the principal classes in the IC Interface Specification.
 - [Textual IDs][]: the textual form of principals in the IC Interface Specification.
@@ -166,6 +183,9 @@ The [ICRC-22][ICRC-22 draft] draft is the current work on that question.
 [CAIP-2 profile]: ./caip2.md
 [CAIP-10]: https://chainagnostic.org/CAIPs/caip-10
 [CAIP-25]: https://chainagnostic.org/CAIPs/caip-25
+[BCP 14]: https://www.rfc-editor.org/info/bcp14
+[RFC 2119]: https://www.rfc-editor.org/rfc/rfc2119
+[RFC 8174]: https://www.rfc-editor.org/rfc/rfc8174
 [Principals]: https://docs.internetcomputer.org/references/ic-interface-spec/#id-classes
 [Textual IDs]: https://docs.internetcomputer.org/references/ic-interface-spec/#textual-ids
 [RFC 4648]: https://datatracker.ietf.org/doc/html/rfc4648#section-6

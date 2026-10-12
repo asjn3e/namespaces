@@ -52,6 +52,13 @@ ICP working groups have discussed CAIP identifiers since 2023, and their drafts 
 In 2023 the working groups agreed twice on a hash of the root public key as the network reference, and this namespace follows that agreement.
 As of this writing, the NNS has not accepted any ICRC on CAIP identifiers.
 
+## Planned profiles
+
+This folder does not yet define the profiles that wallet integrators will need next:
+
+- [CAIP-25][] and [CAIP-27][]: which methods an `icp:` session scope exposes, and how a wallet receives requests for them.
+- [CAIP-122][]: signing in with an ICP account. This profile needs to cover the delegation model of ICP, including Internet Identity, where a session key signs on behalf of a principal instead of the principal's own key.
+
 ## References
 
 - [IC Interface Specification][]: principals, their textual form, the status endpoint, and certification.
@@ -66,6 +73,9 @@ As of this writing, the NNS has not accepted any ICRC on CAIP identifiers.
 
 [CAIP-2]: https://chainagnostic.org/CAIPs/caip-2
 [CAIP-10]: https://chainagnostic.org/CAIPs/caip-10
+[CAIP-25]: https://chainagnostic.org/CAIPs/caip-25
+[CAIP-27]: https://chainagnostic.org/CAIPs/caip-27
+[CAIP-122]: https://chainagnostic.org/CAIPs/caip-122
 [IC Interface Specification]: https://docs.internetcomputer.org/references/ic-interface-spec/
 [ICRC-0]: https://github.com/dfinity/ICRC/blob/main/README.md
 [ICRC-1]: https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-1/README.md

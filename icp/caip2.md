@@ -6,7 +6,7 @@ discussions-to: https://github.com/ChainAgnostic/namespaces/pull/238
 status: Draft
 type: Standard
 created: 2026-10-11
-requires: CAIP-2
+requires: ["CAIP-2"]
 ---
 
 # CAIP-2
@@ -23,14 +23,18 @@ One reference covers the whole network, including all of its subnets.
 
 ## Specification
 
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in [BCP 14][] ([RFC 2119][], [RFC 8174][]) when, and only when, they appear in all capitals, as shown here.
+
 ### Semantics
 
 Each ICP network has one root public key: a BLS12-381 public key in DER encoding.
 The [IC Interface Specification][] calls it "the public key (a DER-encoded BLS key) of the root key of this instance of the Internet Computer Protocol".
 On ICP mainnet the DER encoding is 133 bytes long.
 
-Compute the reference from the DER-encoded bytes, not from the 96-byte raw BLS key inside them.
-Hashing the raw key gives `c110ba599921d585d6b10aba2766c5fc` for mainnet, which is not a valid reference.
+The input to the hash MUST be exactly the byte string that the network serves as the `root_key` field of its [status endpoint][Status endpoint].
+For ICP mainnet, the agent libraries pin the same byte string.
+Implementations MUST NOT re-encode the key before hashing it.
+Hashing the 96-byte raw BLS key inside the DER encoding gives `c110ba599921d585d6b10aba2766c5fc` for mainnet, which is not a valid reference.
 
 ### Syntax
 
@@ -41,13 +45,17 @@ reference:   [0-9a-f]{32}
 
 To compute the reference:
 
-1. Get the DER-encoded root public key of the network.
+1. Get the root key bytes as described in the Semantics section.
 2. Compute the SHA-256 hash of those bytes.
 3. Encode the hash as lowercase hexadecimal.
 4. Keep the first 32 characters.
 
-The reference is always lowercase.
+A reference MUST be exactly 32 lowercase hexadecimal characters.
 `icp:737BA355E855BD4B61279056603E0550` is not a valid chain ID.
+
+Every other reference that [CAIP-2][] allows is reserved for future revisions of this profile.
+A revision that adopts registry names can therefore only add valid references, and no chain ID that is valid under this version can change its meaning.
+The strings `icp:1` and `icp:mainnet` are reserved for ICP mainnet; see the Backwards Compatibility section.
 
 ### Resolution Mechanics
 
@@ -62,8 +70,9 @@ echo 308182301d060d2b0601040182dc7c0503010201060c2b0601040182dc7c050302010361008
 ```
 
 A canister can compute the reference of the network it runs on.
-The system API functions `ic0.root_key_size` and `ic0.root_key_copy` return the DER-encoded root key in replicated execution.
+The system API functions `ic0.root_key_size` and `ic0.root_key_copy` return the root key in replicated execution.
 In Rust, `ic_cdk::api::root_key()` wraps them.
+The [IC Interface Specification][] describes the key they return as "the public key (a DER-encoded BLS key) of the IC root key of this instance of the Internet Computer Protocol".
 
 Any network also serves its root key at the [status endpoint][Status endpoint], `/api/v2/status`, as the `root_key` field of a CBOR map.
 The endpoint is not certified, so use it to compare against a pinned key, or to discover the key of a local development network.
@@ -103,13 +112,19 @@ This profile defines only the hash form, for three reasons:
 
 If the NNS later accepts a network registry, a revision of this profile can adopt registered names.
 Each network still needs exactly one canonical string.
+Because this version reserves every reference that is not a hash, such a revision can only add references and cannot make an existing chain ID ambiguous.
 
 ### Backwards Compatibility
 
 Some ICP drafts used other forms.
 An early [ICRC-22][ICRC-22 draft] draft used `icp:mainnet`, and the ICP Network Identifiers draft proposes `icp:1`.
-Neither was accepted.
-If an implementation encounters either string, it should read it as `icp:737ba355e855bd4b61279056603e0550` and emit only the hash form.
+Neither draft was accepted, and neither string is a valid chain ID under this profile.
+
+- Producers MUST emit only the hash form, `icp:737ba355e855bd4b61279056603e0550`.
+- Consumers MAY accept `icp:mainnet` and `icp:1` from legacy sources.
+  A consumer that accepts either string MUST treat it as `icp:737ba355e855bd4b61279056603e0550`, and MUST NOT treat it as a different network.
+
+This profile reserves both strings for ICP mainnet.
 
 ## Test Cases
 
@@ -139,20 +154,31 @@ A canister keeps its principal when the protocol moves it to another subnet.
 ### Root key changes
 
 The mainnet root key has not changed since the network launched in May 2021.
-The working group drafts describe one case that would change it: a recovery of the NNS subnet in which the threshold signing key is lost, so the network must generate a new key.
+The working group drafts describe one case that would change it: a recovery of the NNS subnet in which the threshold signing key is lost, so the network has to generate a new key.
 A new key gives a new reference.
 The Ledger and Tokenization Working Group discussed this case on 2023-10-31 and treated it as a hard fork: the old network stops, and a new network starts with the same state.
 
 ### Local and private networks
 
-Local development networks, such as those started by `dfx` or PocketIC, generate their own root keys.
-Each one therefore gets its own reference, and no fixed reference exists for "local".
+Local development networks have their own root keys.
+This includes networks started by the [`icp` CLI][icp CLI] (formerly `dfx`) and PocketIC test instances.
+The reference of each one is the hash of its own root key.
+This profile defines no fixed or well-known reference for local networks.
+Such a reference could not be checked against the network, and that check is the property that motivates the hash form.
+
+Current tools derive a local network's root key from the network's configuration.
+The same tool, tool version, and subnet layout produce the same root key again, even after the network's state is discarded, so the reference stays the same from run to run.
+A different tool, tool version, or subnet layout can produce a different root key and therefore a different reference.
+Two separate local networks can therefore share a reference.
+
 Private deployments of the ICP stack also have their own root keys and therefore their own references.
-Clients get the key of such a network from its status endpoint.
+
+Tooling that targets a local or private network SHOULD read the root key from the status endpoint at startup and derive the reference from it, rather than hard-code a chain ID.
 
 ## References
 
 - [CAIP-2][]: the Blockchain ID Specification.
+- [BCP 14][]: the meaning of the requirement key words, defined by [RFC 2119][] and [RFC 8174][].
 - [IC Interface Specification][]: the root key, certification, and the system API.
 - [Status endpoint][]: the `/api/v2/status` endpoint and its `root_key` field.
 - [icvc/icp-namespace][]: the 2023 working group draft of this profile, by Quint Daenen.
@@ -161,9 +187,14 @@ Clients get the key of such a network from its status endpoint.
 - [ICP Network Identifiers draft][]: the 2025 working group draft with the hash and registry options.
 - [ICP Network Registry draft][]: the 2025 draft registry of short network names.
 - [ICRC-22 draft][]: payment request URIs that use this chain ID.
+- [icp CLI][]: the command-line tool that starts local networks.
 
 [CAIP-2]: https://chainagnostic.org/CAIPs/caip-2
 [CAIP-25]: https://chainagnostic.org/CAIPs/caip-25
+[BCP 14]: https://www.rfc-editor.org/info/bcp14
+[RFC 2119]: https://www.rfc-editor.org/rfc/rfc2119
+[RFC 8174]: https://www.rfc-editor.org/rfc/rfc8174
+[icp CLI]: https://github.com/dfinity/icp-cli
 [IC Interface Specification]: https://docs.internetcomputer.org/references/ic-interface-spec/
 [Status endpoint]: https://docs.internetcomputer.org/references/ic-interface-spec/https-interface#api-status
 [icvc/icp-namespace]: https://github.com/icvc/icp-namespace/pull/1
